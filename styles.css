@@ -6,7 +6,12 @@
   --text-writh: #ffffff;
   --accent: #1739c0;
   --accent-hover: #0ea5e9;
-  --gradient: linear-gradient(135deg, #1739c0 0%, #818cf8 100%);
+  --accent-secondary: #818cf8;
+  --gradient: linear-gradient(
+    135deg,
+    var(--bg-primary) 0%,
+    var(--accent-secondary) 100%
+  );
   --bg-buttom-github: #262c36;
 }
 
@@ -33,10 +38,17 @@ body::before {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: white;
-  /* background: 
-                radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(129, 140, 248, 0.1) 0%, transparent 40%); */
+  background-color: var(--bg-primary);
+  background-image: radial-gradient(
+      circle at 10% 20%,
+      color-mix(in srgb, var(--accent-hover) 18%, transparent) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      color-mix(in srgb, var(--accent-secondary) 18%, transparent) 0%,
+      transparent 40%
+    );
   z-index: -1;
 }
 
@@ -49,7 +61,7 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #1739c0;
+  background: var(--bg-primary);
   backdrop-filter: blur(10px);
   z-index: 100;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -62,7 +74,7 @@ header {
 }
 
 .logo img {
-  height: 36px;
+  height: 40px;
   width: auto;
   display: block;
 }
@@ -81,20 +93,34 @@ nav a {
 }
 
 nav a:hover {
-  color: var(--accent);
+  color: var(--accent-hover);
 }
 
 /* Hero Section */
 .hero {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary);
+  background-image: url("img/background_header.svg");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+}
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
   align-items: flex-start;
+  width: 100%;
   padding: 0 10%;
   max-width: 1200px;
   margin: 0 auto;
-  background: url('img/background_header.svg') no-repeat center center / cover;
 }
 
 .hero h1 {
@@ -146,7 +172,7 @@ nav a:hover {
 .btn-primary {
   /* background: var(--gradient);*/
   background-color: var(--bg-primary);
-  color: var(--bg-writh);
+  color: var(--text-writh);
 }
 
 .btn-secondary {
@@ -198,7 +224,7 @@ section {
 }
 
 .stack-card {
-  background: rgba(30, 41, 59, 0.5);
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
   border: 1px solid rgba(255, 255, 255, 0.05);
   padding: 2rem;
   border-radius: 16px;
@@ -210,11 +236,11 @@ section {
 
 .stack-card:hover {
   transform: translateY(-5px);
-  border-color: var(--accent);
+  border-color: var(--accent-hover);
 }
 
 .stack-card h3 {
-  color: var(--accent);
+  color: var(--accent-hover);
   margin-bottom: 1rem;
   font-size: 1.25rem;
 }
@@ -247,9 +273,9 @@ section {
 }
 
 .client-tag:hover {
-  background: var(--accent);
-  color: var(--bg-primary);
-  border-color: var(--accent);
+  background: var(--accent-hover);
+  color: var(--text-writh);
+  border-color: var(--accent-hover);
 }
 
 /* Footer */
@@ -262,7 +288,7 @@ footer {
 }
 
 footer a {
-  color: var(--accent);
+  color: var(--accent-hover);
   text-decoration: none;
 }
 
@@ -271,7 +297,7 @@ footer a {
   nav ul {
     display: none;
   } /* Simplificado para mobile, pode adicionar menu hamburger depois */
-  .hero {
+  .hero-content {
     padding: 0 5%;
     text-align: center;
     align-items: center;
