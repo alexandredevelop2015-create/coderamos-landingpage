@@ -94,6 +94,7 @@ nav a:hover {
   padding: 0 10%;
   max-width: 1200px;
   margin: 0 auto;
+  background: url('img/background_header.svg') no-repeat center center / cover;
 }
 
 .hero h1 {
