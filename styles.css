@@ -29,9 +29,9 @@
             position: fixed;
             top: 0; left: 0;
             width: 100vw; height: 100vh;
-            background: 
+            /* background: 
                 radial-gradient(circle at 10% 20%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 90% 80%, rgba(129, 140, 248, 0.1) 0%, transparent 40%);
+                radial-gradient(circle at 90% 80%, rgba(129, 140, 248, 0.1) 0%, transparent 40%); */
             z-index: -1;
         }
 
@@ -51,12 +51,15 @@
         }
 
         .logo {
-            font-size: 1.5rem;
-            font-weight: 800;
-            background: var(--gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
             text-decoration: none;
+        }
+
+        .logo img {
+            height: 36px;
+            width: auto;
+            display: block;
         }
 
         nav ul {
