@@ -632,3 +632,44 @@ section {
   text-align: center;
   justify-content: center;
 }
+
+/* Tech Carousel */
+.tech-carousel-wrapper {
+  overflow: hidden;
+  width: 100%;
+  margin-top: 4rem;
+  padding: 1rem 0;
+  position: relative;
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+
+.tech-carousel {
+  display: flex;
+  gap: 4rem;
+  width: max-content;
+  animation: scroll 30s linear infinite;
+  align-items: center;
+}
+
+.tech-carousel:hover {
+  animation-play-state: paused;
+}
+
+.tech-carousel img {
+  height: 50px;
+  width: auto;
+  opacity: 0.8;
+  transition: all 0.3s;
+}
+
+.tech-carousel img:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+@keyframes scroll {
+  to {
+    transform: translateX(calc(-50% - 2rem));
+  }
+}
