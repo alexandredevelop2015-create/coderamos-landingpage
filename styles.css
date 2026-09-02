@@ -82,7 +82,7 @@ header {
 }
 
 nav ul {
-  display: flex;
+  display: none;
   gap: 2rem;
   list-style: none;
 }
@@ -120,8 +120,9 @@ nav a:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  text-align: center;
   width: 100%;
-  padding: 2rem 5%;
+  padding: 0 5%;
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -151,10 +152,10 @@ nav a:hover {
 /* Services Highlight (3 Boxes) */
 .services-highlight {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   gap: 2rem;
   margin-bottom: 3rem;
-  flex-wrap: wrap;
 }
 
 .service-box {
@@ -248,8 +249,8 @@ nav a:hover {
 .section-sobre {
   background-color: var(--bg-secondary);
   position: relative;
-  max-width: 100%; /* Override the global section max-width */
-  padding: 6rem 5%;
+  max-width: 100%;
+  padding: 4rem 5%;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -277,6 +278,7 @@ nav a:hover {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .btn {
@@ -323,7 +325,7 @@ nav a:hover {
 
 /* Sections */
 section {
-  padding: 6rem 10%;
+  padding: 4rem 5%;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -348,7 +350,7 @@ section {
 
 /* Stack Section */
 .section-stack {
-  padding: 6rem 10%;
+  padding: 4rem 5%;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -446,10 +448,10 @@ section {
   max-width: 1200px;
   margin: 0 auto;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+  text-align: center;
+  gap: 1.5rem;
 }
 
 .bottom-bar-item {
@@ -465,7 +467,7 @@ section {
 }
 
 .bottom-bar-text.right-align {
-  text-align: right;
+  text-align: center;
 }
 
 .bottom-bar-text .lbl {
@@ -503,27 +505,49 @@ section {
   transform: scale(1.1);
 }
 
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
+
+/* Desktop Responsiveness (Mobile First) */
+@media (min-width: 768px) {
   nav ul {
-    display: none;
-  } /* Simplificado para mobile, pode adicionar menu hamburger depois */
+    display: flex;
+  }
+  
   .hero-content {
-    padding: 0 5%;
-    text-align: center;
-    align-items: center;
+    padding: 2rem 5%;
   }
-  .hero p {
-    margin-left: auto;
-    margin-right: auto;
-  }
-  section {
-    padding: 4rem 5%;
-  }
-  .cta-group {
+
+  .services-highlight {
+    flex-direction: row;
     justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  section {
+    padding: 6rem 10%;
+  }
+  
+  .section-sobre {
+    padding: 6rem 5%;
+  }
+
+  .section-stack {
+    padding: 6rem 10%;
+  }
+
+  .cta-group {
+    justify-content: flex-start;
+  }
+
+  .bottom-bar-content {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .bottom-bar-text.right-align {
+    text-align: right;
   }
 }
+
 
 /* Chat FAB (n8n Integration) */
 .chat-fab-container {
