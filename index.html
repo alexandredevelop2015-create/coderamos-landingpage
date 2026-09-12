@@ -392,16 +392,65 @@
     <div class="chat-fab-container">
       <div id="chatWidget" class="chat-widget hidden">
         <div class="chat-header">
-          <h3>Atendimento</h3>
+          <div class="chat-header-info">
+            <span class="chat-status-dot"></span>
+            <h3>Assistente Virtual</h3>
+          </div>
           <button id="closeChatBtn" aria-label="Fechar">&times;</button>
         </div>
-        <div class="chat-body">
-          <p>
-            Integração n8n preparada. Insira o iframe do chat ou conecte o
-            webhook do n8n aqui.
-          </p>
-          <!-- Exemplo: <iframe src="SEU_WEBHOOK_DO_N8N" width="100%" height="100%" frameborder="0"></iframe> -->
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-msg bot welcome-msg">
+            <p>Olá! 👋 Seja bem-vindo ao portfólio de <strong>Carlos Alexandre Rezende Ramos</strong>.</p>
+            <p>Sou Engenheiro de Software Full-Stack Sênior e Arquiteto de Soluções com 15+ anos de experiência em sistemas de alta escala (Natura, Grupo RD, MEC, Bradesco).</p>
+            <p>Para que eu possa direcionar seu atendimento da melhor forma, por favor, escolha uma opção abaixo:</p>
+            
+            <div class="chat-options-list" id="chatInitialOptions">
+              <button type="button" class="chat-option-btn" data-option="1" data-label="1️⃣ Proposta de Projeto ou Consultoria">
+                <span class="chat-option-title">1️⃣ Proposta de Projeto ou Consultoria</span>
+                <span class="chat-option-desc">Desenvolvimento de software, arquitetura ou otimização de sistemas</span>
+              </button>
+              <button type="button" class="chat-option-btn" data-option="2" data-label="2️⃣ Oportunidades de Carreira / Vagas">
+                <span class="chat-option-title">2️⃣ Oportunidades de Carreira / Vagas</span>
+                <span class="chat-option-desc">Sou recrutador ou represento uma empresa com vaga aberta</span>
+              </button>
+              <button type="button" class="chat-option-btn" data-option="3" data-label="3️⃣ Ver Portfólio e Cases de Sucesso">
+                <span class="chat-option-title">3️⃣ Ver Portfólio e Cases de Sucesso</span>
+                <span class="chat-option-desc">Quero ver exemplos de projetos e tecnologias antes de conversar</span>
+              </button>
+              <button type="button" class="chat-option-btn" data-option="4" data-label="4️⃣ Falar diretamente com o Carlos">
+                <span class="chat-option-title">4️⃣ Falar diretamente com o Carlos</span>
+                <span class="chat-option-desc">Redirecionar para WhatsApp ou E-mail</span>
+              </button>
+            </div>
+          </div>
         </div>
+        <form class="chat-input-area" id="chatForm">
+          <input
+            type="text"
+            id="chatInput"
+            placeholder="Selecione uma opção acima..."
+            autocomplete="off"
+            minlength="3"
+            maxlength="500"
+            pattern="^(?!.*<script).*$"
+            title="A mensagem deve ter entre 3 e 500 caracteres e não conter tags de script."
+            disabled
+            required
+          />
+          <button type="submit" id="chatSendBtn" aria-label="Enviar" disabled>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+            >
+              <path
+                d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576zm6.787-8.201L1.591 6.602l4.339 2.76z"
+              />
+            </svg>
+          </button>
+        </form>
       </div>
 
       <button
@@ -428,13 +477,150 @@
       const chatFabBtn = document.getElementById("chatFabBtn");
       const chatWidget = document.getElementById("chatWidget");
       const closeChatBtn = document.getElementById("closeChatBtn");
+      const chatForm = document.getElementById("chatForm");
+      const chatInput = document.getElementById("chatInput");
+      const chatSendBtn = document.getElementById("chatSendBtn");
+      const chatMessages = document.getElementById("chatMessages");
+      const webhookUrl = "https://ia.n8n.genesisits.com.br/webhook/0e7c34df-1ce7-4c03-ade1-d0c34e50b42d";
+
+      // Gerar ou recuperar sessionId único para a conversa
+      let sessionId = sessionStorage.getItem("n8n_chat_session_id");
+      if (!sessionId) {
+        sessionId = "session_" + Math.random().toString(36).substring(2, 11) + "_" + Date.now();
+        sessionStorage.setItem("n8n_chat_session_id", sessionId);
+      }
 
       chatFabBtn.addEventListener("click", () => {
         chatWidget.classList.toggle("hidden");
+        if (!chatWidget.classList.contains("hidden") && !chatInput.disabled) {
+          chatInput.focus();
+        }
       });
 
       closeChatBtn.addEventListener("click", () => {
         chatWidget.classList.add("hidden");
+      });
+
+      function appendMessage(text, sender) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `chat-msg ${sender}`;
+        msgDiv.textContent = text;
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return msgDiv;
+      }
+
+      function createLoadingMessage(text = "Direcionando o atendimento") {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "chat-msg bot loading";
+        msgDiv.innerHTML = `<span>${text}</span><span class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span>`;
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return msgDiv;
+      }
+
+      function enableChatInput() {
+        chatInput.disabled = false;
+        chatSendBtn.disabled = false;
+        chatInput.placeholder = "Digite sua mensagem...";
+        if (!chatWidget.classList.contains("hidden")) {
+          chatInput.focus();
+        }
+      }
+
+      function validateInput(text) {
+        if (!text || text.length < 3) {
+          return "A mensagem deve conter no mínimo 3 caracteres.";
+        }
+        if (text.length > 500) {
+          return "A mensagem deve conter no máximo 500 caracteres.";
+        }
+        const scriptRegex = /^(?!.*<script).*$/i;
+        if (!scriptRegex.test(text)) {
+          return "Mensagem inválida. Não é permitido o uso de tags de script.";
+        }
+        return null;
+      }
+
+      async function sendChatMessage(displayText, payloadInput) {
+        appendMessage(displayText, "user");
+        chatInput.value = "";
+
+        // Desativa os botões do menu inicial para evitar múltiplos cliques
+        const optionButtons = document.querySelectorAll(".chat-option-btn");
+        optionButtons.forEach((btn) => {
+          btn.disabled = true;
+        });
+
+        const loadingMsg = createLoadingMessage("Direcionando o atendimento");
+
+        try {
+          const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              action: "sendMessage",
+              chatInput: payloadInput,
+              sessionId: sessionId,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Erro na resposta: ${response.status}`);
+          }
+
+          const data = await response.json();
+          let reply = data.output || data.text || data.message || (typeof data === "string" ? data : JSON.stringify(data));
+          
+          loadingMsg.classList.remove("loading");
+          loadingMsg.textContent = reply;
+          
+          // Habilita o campo de input após o primeiro retorno do n8n
+          enableChatInput();
+        } catch (error) {
+          loadingMsg.classList.remove("loading");
+          loadingMsg.classList.add("error");
+          loadingMsg.textContent = "O atendimento por este canal no momento encontra-se indisponível. Favor utilizar os demais canais de contato presentes em nossa página.";
+          
+          // Reabilita as opções para permitir nova tentativa se o usuário desejar
+          optionButtons.forEach((btn) => {
+            btn.disabled = false;
+          });
+        }
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      // Event listener para cliques nos botões de menu (1, 2, 3, 4)
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".chat-option-btn");
+        if (btn && !btn.disabled) {
+          const optionNumber = btn.getAttribute("data-option");
+          const optionLabel = btn.getAttribute("data-label") || btn.innerText;
+          sendChatMessage(optionLabel, optionNumber);
+        }
+      });
+
+      // Event listener para envio via formulário de input
+      chatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        
+        const errorMsg = validateInput(text);
+        if (errorMsg) {
+          chatInput.setCustomValidity(errorMsg);
+          chatInput.reportValidity();
+          return;
+        }
+        chatInput.setCustomValidity("");
+
+        sendChatMessage(text, text);
+      });
+
+      // Limpa erro de validação customizado ao digitar
+      chatInput.addEventListener("input", () => {
+        chatInput.setCustomValidity("");
       });
     </script>
   </body>
