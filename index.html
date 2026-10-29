@@ -568,11 +568,11 @@
                   aberta</span
                 >
               </button>
-              <button
+              <!-- <button
                 type="button"
                 class="chat-option-btn"
                 data-option="3"
-                data-label="3️⃣ Ver Portfólio e Cases de Sucesso"
+                data-label="3️⃣ Portfólio e Cases de Sucesso"
               >
                 <span class="chat-option-title"
                   >3️⃣ Ver Portfólio e Cases de Sucesso</span
@@ -594,7 +594,7 @@
                 <span class="chat-option-desc"
                   >Redirecionar para WhatsApp ou E-mail</span
                 >
-              </button>
+              </button> -->
             </div>
           </div>
         </div>
@@ -655,9 +655,10 @@
       const chatInput = document.getElementById("chatInput");
       const chatSendBtn = document.getElementById("chatSendBtn");
       const chatMessages = document.getElementById("chatMessages");
-      // const webhookUrl = "https://ia.n8n.genesisits.com.br/webhook/0e7c34df-1ce7-4c03-ade1-d0c34e50b42d";
-      const webhookUrl =
-        "https://ia.n8n.genesisits.com.br/webhook-test/0e7c34df-1ce7-4c03-ade1-d0c34e50b42d";
+      //const webhookUrl = "https://ia.n8n.genesisits.com.br/webhook/0e7c34df-1ce7-4c03-ade1-d0c34e50b42d";
+      const webhookUrl = "https://ia.n8n.genesisits.com.br/webhook-test/0e7c34df-1ce7-4c03-ade1-d0c34e50b42d";
+      //const webhookFormUrl = "https://ia.n8n.genesisits.com.br/webhook/9479fa95-2c0c-4509-8a19-cb1c1d76685b";
+      const webhookFormUrl = "https://ia.n8n.genesisits.com.br/webhook-test/9479fa95-2c0c-4509-8a19-cb1c1d76685b";
 
       // Gerar ou recuperar sessionId único para a conversa
       let sessionId = sessionStorage.getItem("n8n_chat_session_id");
@@ -669,6 +670,16 @@
           Date.now();
         sessionStorage.setItem("n8n_chat_session_id", sessionId);
       }
+
+      let currentStep = "step-1";
+      let formInstanceId = 0;
+
+      const OPTION_INITIAL_STEP = {
+        1: "step-1",
+        2: "step-2",
+        3: "step-3",
+        4: "step-4",
+      };
 
       chatFabBtn.addEventListener("click", () => {
         chatWidget.classList.toggle("hidden");
@@ -690,7 +701,7 @@
         return msgDiv;
       }
 
-      function createLoadingMessage(text = "Direcionando o atendimento") {
+      function createLoadingMessage(text = "Digitando...") {
         const msgDiv = document.createElement("div");
         msgDiv.className = "chat-msg bot loading";
         msgDiv.innerHTML = `<span>${text}</span><span class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span>`;
@@ -708,6 +719,12 @@
         }
       }
 
+      function disableChatInput(placeholder = "Preencha o formulário acima...") {
+        chatInput.disabled = true;
+        chatSendBtn.disabled = true;
+        chatInput.placeholder = placeholder;
+      }
+
       function validateInput(text) {
         if (!text || text.length < 3) {
           return "A mensagem deve conter no mínimo 3 caracteres.";
@@ -722,20 +739,629 @@
         return null;
       }
 
-      async function sendChatMessage(displayText, payloadInput) {
-        appendMessage(displayText, "user");
+      function slugifyField(label) {
+        return String(label)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_|_$/g, "");
+      }
+
+      // Regras da planilha / tabelas (leads + oportunidades)
+      const FIELD_DEFS = {
+        nome: {
+          match: (k) =>
+            k === "nome" || k === "nome_contato" || k.startsWith("nome_do"),
+          requiredIn: ["leads", "oportunidades"],
+          regex: /^[a-zA-ZÀ-ÿ\s]{3,150}$/,
+          maxLength: 150,
+          error: "Nome inválido (mín. 3 letras, sem números)",
+        },
+        email: {
+          match: (k) => k.includes("email"),
+          requiredIn: ["leads", "oportunidades"],
+          regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+          maxLength: 150,
+          type: "email",
+          error: "E-mail inválido",
+        },
+        razao_social: {
+          match: (k) => k.includes("razao_social"),
+          requiredIn: [],
+          regex: /^[a-zA-Z0-9\s.,]{0,200}$/,
+          maxLength: 200,
+          error: "Razão social inválida",
+        },
+        cnpj: {
+          match: (k) => k === "cnpj",
+          requiredIn: [],
+          mask: "cnpj",
+          regex: /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/,
+          maxLength: 18,
+          error: "CNPJ inválido",
+        },
+        telefone: {
+          match: (k) =>
+            (k.includes("telefone") ||
+              k.includes("teleforne") ||
+              k.includes("fone") ||
+              k.includes("recrutador")) &&
+            !k.includes("whatsapp"),
+          requiredIn: [],
+          mask: "phone",
+          regex: /^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/,
+          maxLength: 20,
+          error: "Telefone inválido. Ex: (11) 3456-7890",
+        },
+        whatsapp: {
+          match: (k) => k.includes("whatsapp"),
+          requiredIn: [],
+          mask: "whatsapp",
+          regex: /^\(?\d{2}\)?\s?9\d{4}-?\d{4}$/,
+          maxLength: 20,
+          error: "WhatsApp inválido. Ex: (11) 91234-5678",
+        },
+        descricao: {
+          match: (k) =>
+            k.includes("descricao") ||
+            k.includes("descri") ||
+            k.includes("breve"),
+          requiredIn: [],
+          tag: "textarea",
+          maxLengthByForm: { leads: 700, oportunidades: 2000 },
+          error: "Descrição excede o limite de caracteres",
+        },
+        nome_empresa: {
+          match: (k) => k.includes("nome_da_empresa") || k === "nome_empresa",
+          requiredIn: [],
+          regex: /^[a-zA-Z0-9\s.,]{0,200}$/,
+          maxLength: 200,
+          error: "Nome da empresa inválido",
+        },
+        titulo_vaga: {
+          match: (k) => k.includes("titulo_da_vaga") || k === "titulo_vaga",
+          requiredIn: ["oportunidades"],
+          regex: /^.{3,150}$/,
+          maxLength: 150,
+          error: "Título da vaga é obrigatório (mín. 3 caracteres)",
+        },
+        tipo_contratacao: {
+          match: (k) =>
+            k.includes("tipo_de_contrato") ||
+            k.includes("tipo_contratacao") ||
+            k === "contrato",
+          requiredIn: ["oportunidades"],
+          tag: "select",
+          options: ["CLT", "PJ"],
+          regex: /^(CLT|PJ)$/,
+          error: "Tipo de contratação inválido",
+        },
+        faixa_salarial: {
+          match: (k) =>
+            k.includes("faixa_salarial") ||
+            (k.includes("faixa") && k.includes("salar")) ||
+            k.includes("salario"),
+          requiredIn: ["oportunidades"],
+          mask: "currency",
+          regex:
+            /^[R$\s]?\d+([.,]\d{3})*([.,]\d{2})?(\s?-\s?[R$\s]?\d+([.,]\d{3})*([.,]\d{2})?)?$/,
+          error: "Faixa salarial inválida",
+        },
+        link_vaga: {
+          match: (k) =>
+            k.includes("link_da_vaga") ||
+            k.includes("link_vaga") ||
+            ((k.includes("link") || k.includes("url")) && k.includes("vaga")),
+          requiredIn: [],
+          type: "url",
+          regex:
+            /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)$/,
+          maxLength: 250,
+          error: "Link da vaga inválido (use http:// ou https://)",
+        },
+        modalidade: {
+          match: (k) => k.includes("modalidade"),
+          requiredIn: [],
+          tag: "select",
+          options: ["Remoto", "Hibrido", "Presencial"],
+          regex: /^(Remoto|Hibrido|Presencial)$/,
+          error: "Modalidade inválida",
+        },
+      };
+
+      function resolveFormProfile(step) {
+        const s = String(step || currentStep || "");
+        if (s.startsWith("step-2") || s.startsWith("step_2")) {
+          return {
+            id: "oportunidades",
+            origem: "site_chatbot",
+            status: "novo",
+          };
+        }
+        return { id: "leads", origem: "site", status: "novo" };
+      }
+
+      function resolveFieldDef(label) {
+        const key = slugifyField(label);
+        for (const [id, def] of Object.entries(FIELD_DEFS)) {
+          if (def.match(key)) return { id, ...def, key };
+        }
+        return {
+          id: key || "campo",
+          key,
+          requiredIn: ["leads", "oportunidades"],
+          maxLength: 500,
+          error: "Campo inválido",
+        };
+      }
+
+      function isFieldRequired(def, formProfileId) {
+        return (def.requiredIn || []).includes(formProfileId);
+      }
+
+      function onlyDigits(value) {
+        return String(value || "").replace(/\D/g, "");
+      }
+
+      function formatCurrencyBRL(digits) {
+        const nums = onlyDigits(digits).slice(0, 15);
+        if (!nums) return "";
+        const cents = nums.padStart(3, "0");
+        const integerPart = cents.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+        const decimalPart = cents.slice(-2);
+        const withThousands = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        return `R$ ${withThousands},${decimalPart}`;
+      }
+
+      function unmaskCurrencyBRL(maskedValue) {
+        const nums = onlyDigits(maskedValue);
+        if (!nums) return "";
+        const cents = nums.padStart(3, "0");
+        const integerPart = cents.slice(0, -2).replace(/^0+(?=\d)/, "") || "0";
+        const decimalPart = cents.slice(-2);
+        return `${integerPart}.${decimalPart}`;
+      }
+
+      function formatCnpj(value) {
+        const d = onlyDigits(value).slice(0, 14);
+        return d
+          .replace(/^(\d{2})(\d)/, "$1.$2")
+          .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+          .replace(/\.(\d{3})(\d)/, ".$1/$2")
+          .replace(/(\d{4})(\d)/, "$1-$2");
+      }
+
+      function formatPhoneBR(value) {
+        const d = onlyDigits(value).slice(0, 11);
+        if (d.length <= 2) return d.length ? `(${d}` : "";
+        if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+        if (d.length <= 10) {
+          return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+        }
+        return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+      }
+
+      function formatWhatsappBR(value) {
+        let d = onlyDigits(value).slice(0, 11);
+        if (d.length > 2 && d[2] !== "9") {
+          d = d.slice(0, 2) + "9" + d.slice(2);
+          d = d.slice(0, 11);
+        }
+        return formatPhoneBR(d);
+      }
+
+      function getFieldSubmitValue(control) {
+        const mask = control.dataset.mask;
+        if (mask === "currency") return unmaskCurrencyBRL(control.value);
+        if (mask === "cnpj" || mask === "phone" || mask === "whatsapp") {
+          return onlyDigits(control.value);
+        }
+        return control.value.trim();
+      }
+
+      function validateControl(control, formProfileId) {
+        const defId = control.dataset.fieldId;
+        const def = FIELD_DEFS[defId] || {
+          requiredIn: ["leads", "oportunidades"],
+          error: "Campo inválido",
+        };
+        const required = control.dataset.required === "true";
+        const raw = control.value.trim();
+        const submitValue = getFieldSubmitValue(control);
+
+        if (!raw) {
+          return required
+            ? { ok: false, message: "Campo obrigatório" }
+            : { ok: true, message: "" };
+        }
+
+        const maxLen =
+          (def.maxLengthByForm && def.maxLengthByForm[formProfileId]) ||
+          def.maxLength;
+        if (maxLen && raw.length > maxLen) {
+          return {
+            ok: false,
+            message: def.error || `Máximo de ${maxLen} caracteres`,
+          };
+        }
+
+        if (def.mask === "currency") {
+          const digits = onlyDigits(raw);
+          if (digits.length < 3) {
+            return { ok: false, message: def.error };
+          }
+          if (!def.regex.test(raw) && !/^\d+\.\d{2}$/.test(submitValue)) {
+            return { ok: false, message: def.error };
+          }
+          return { ok: true, message: "" };
+        }
+
+        if (def.mask === "cnpj" && onlyDigits(raw).length !== 14) {
+          return { ok: false, message: def.error };
+        }
+
+        if (def.regex && !def.regex.test(raw)) {
+          return { ok: false, message: def.error || "Valor inválido" };
+        }
+
+        return { ok: true, message: "" };
+      }
+
+      function updateFormValidationState(form) {
+        const profileId = form.dataset.profile || "leads";
+        const submitBtn = form.querySelector(".chat-form-submit");
+        let allValid = true;
+
+        form.querySelectorAll("input, textarea, select").forEach((control) => {
+          const errorEl = form.querySelector(
+            `[data-error-for="${control.id}"]`
+          );
+          const result = validateControl(control, profileId);
+          const touched = control.dataset.touched === "true";
+
+          if (!result.ok) allValid = false;
+
+          if (errorEl) {
+            errorEl.textContent = touched && !result.ok ? result.message : "";
+          }
+          control.classList.toggle("is-invalid", touched && !result.ok);
+          control.classList.toggle("is-valid", touched && result.ok && !!control.value.trim());
+        });
+
+        if (submitBtn) submitBtn.disabled = !allValid;
+        return allValid;
+      }
+
+      function attachMask(control, mask) {
+        control.dataset.mask = mask;
+        control.inputMode = "numeric";
+
+        const apply = () => {
+          if (mask === "currency") control.value = formatCurrencyBRL(control.value);
+          if (mask === "cnpj") control.value = formatCnpj(control.value);
+          if (mask === "phone") control.value = formatPhoneBR(control.value);
+          if (mask === "whatsapp") control.value = formatWhatsappBR(control.value);
+        };
+
+        control.addEventListener("input", apply);
+        control.addEventListener("keydown", (e) => {
+          if (mask !== "currency" && mask !== "cnpj" && mask !== "phone" && mask !== "whatsapp") {
+            return;
+          }
+          const allowed = [
+            "Backspace",
+            "Delete",
+            "Tab",
+            "ArrowLeft",
+            "ArrowRight",
+            "Home",
+            "End",
+          ];
+          if (allowed.includes(e.key) || e.ctrlKey || e.metaKey) return;
+          if (!/^\d$/.test(e.key)) e.preventDefault();
+        });
+        control.addEventListener("paste", (e) => {
+          e.preventDefault();
+          const pasted = (e.clipboardData || window.clipboardData).getData("text");
+          control.value = pasted;
+          apply();
+          control.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+      }
+
+      function createFieldControl(labelText, fieldId, index, formProfile) {
+        const def = resolveFieldDef(labelText);
+        const required = isFieldRequired(def, formProfile.id);
+        const tag = def.tag || "input";
+        const control = document.createElement(tag);
+        control.id = fieldId;
+        control.name = def.id || slugifyField(labelText) || `campo_${index}`;
+        control.dataset.label = labelText;
+        control.dataset.fieldId = def.id;
+        control.dataset.required = required ? "true" : "false";
+        if (required) control.required = true;
+
+        const maxLen =
+          (def.maxLengthByForm && def.maxLengthByForm[formProfile.id]) ||
+          def.maxLength;
+        if (maxLen) control.maxLength = maxLen;
+
+        if (tag === "select") {
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = required ? "Selecione..." : "Opcional";
+          placeholder.disabled = required;
+          placeholder.selected = true;
+          control.appendChild(placeholder);
+          (def.options || []).forEach((opt) => {
+            const option = document.createElement("option");
+            option.value = opt;
+            option.textContent = opt;
+            control.appendChild(option);
+          });
+          return control;
+        }
+
+        if (tag === "textarea") {
+          control.rows = 3;
+          control.placeholder = required
+            ? `${labelText} *`
+            : `${labelText} (opcional)`;
+          return control;
+        }
+
+        control.type = def.type || "text";
+        control.autocomplete = "on";
+        control.placeholder = required
+          ? `${labelText} *`
+          : `${labelText} (opcional)`;
+
+        if (def.mask === "currency") {
+          control.placeholder = "R$ 10.000,00";
+          attachMask(control, "currency");
+        } else if (def.mask === "cnpj") {
+          control.placeholder = "00.000.000/0000-00";
+          attachMask(control, "cnpj");
+        } else if (def.mask === "phone") {
+          control.placeholder = "(11) 3456-7890";
+          control.type = "tel";
+          attachMask(control, "phone");
+        } else if (def.mask === "whatsapp") {
+          control.placeholder = "(11) 91234-5678";
+          control.type = "tel";
+          attachMask(control, "whatsapp");
+        }
+
+        return control;
+      }
+
+      function tryParseJson(value) {
+        if (typeof value !== "string") return value;
+        const trimmed = value.trim();
+        if (!trimmed || (trimmed[0] !== "{" && trimmed[0] !== "[")) return value;
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          return value;
+        }
+      }
+
+      function unwrapPayload(data) {
+        let current = tryParseJson(data);
+        while (true) {
+          if (Array.isArray(current)) {
+            current = tryParseJson(current[0]);
+            continue;
+          }
+          if (current && typeof current === "object" && current.json != null) {
+            current = tryParseJson(current.json);
+            continue;
+          }
+          break;
+        }
+        return current;
+      }
+
+      // Qualquer resposta com "itens" vira formulário — independente do step
+      function parseFormPayload(data) {
+        const obj = unwrapPayload(data);
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+
+        const itens = obj.itens || obj.items;
+        if (!Array.isArray(itens) || itens.length === 0) return null;
+
+        return {
+          title: obj.title || obj.ttle || "",
+          description: obj.description || obj.desc || "",
+          itens: itens.map((item) => String(item)),
+          step: obj.step || currentStep,
+        };
+      }
+
+      function extractTextReply(data) {
+        const visit = (value) => {
+          if (value == null) return null;
+          if (typeof value === "string") {
+            const maybeJson = tryParseJson(value);
+            if (maybeJson !== value && parseFormPayload(maybeJson)) return null;
+            const trimmed = value.trim();
+            return trimmed || null;
+          }
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              const found = visit(item);
+              if (found) return found;
+            }
+            return null;
+          }
+          if (typeof value === "object") {
+            if (parseFormPayload(value)) return null;
+            for (const key of ["output", "text", "message", "reply", "response"]) {
+              if (value[key] != null) {
+                const found = visit(value[key]);
+                if (found) return found;
+              }
+            }
+            if (value.json != null) return visit(value.json);
+          }
+          return null;
+        };
+        return visit(data);
+      }
+
+      function resolveWebhookPayload(parsed) {
+        const directForm = parseFormPayload(parsed);
+        if (directForm) return { type: "form", form: directForm };
+
+        const root = unwrapPayload(parsed);
+        if (root && typeof root === "object") {
+          for (const key of ["output", "text", "message", "reply", "response"]) {
+            if (root[key] == null) continue;
+            const nestedForm = parseFormPayload(root[key]);
+            if (nestedForm) return { type: "form", form: nestedForm };
+          }
+        }
+
+        const reply = extractTextReply(parsed);
+        if (reply) return { type: "text", reply };
+        return null;
+      }
+
+      function renderChatForm(container, formData) {
+        formInstanceId += 1;
+        const instance = formInstanceId;
+        const formProfile = resolveFormProfile(formData.step);
+
+        container.classList.remove("loading");
+        container.classList.add("form-msg");
+        container.textContent = "";
+
+        const form = document.createElement("form");
+        form.className = "chat-dynamic-form";
+        form.dataset.step = formData.step;
+        form.dataset.profile = formProfile.id;
+        form.noValidate = true;
+
+        if (formData.title) {
+          const title = document.createElement("h4");
+          title.className = "chat-form-title";
+          title.textContent = formData.title;
+          form.appendChild(title);
+        }
+
+        if (formData.description) {
+          const desc = document.createElement("p");
+          desc.className = "chat-form-desc";
+          desc.textContent = formData.description;
+          form.appendChild(desc);
+        }
+
+        const fieldsWrap = document.createElement("div");
+        fieldsWrap.className = "chat-form-fields";
+
+        formData.itens.forEach((labelText, index) => {
+          const field = document.createElement("div");
+          field.className = "chat-form-field";
+
+          const def = resolveFieldDef(labelText);
+          const required = isFieldRequired(def, formProfile.id);
+          const fieldId = `chat-field-${instance}-${def.id || index}`;
+
+          const label = document.createElement("label");
+          label.setAttribute("for", fieldId);
+          label.textContent = required ? `${labelText} *` : labelText;
+
+          const control = createFieldControl(
+            labelText,
+            fieldId,
+            index,
+            formProfile
+          );
+
+          const errorEl = document.createElement("span");
+          errorEl.className = "chat-form-error";
+          errorEl.dataset.errorFor = fieldId;
+
+          const onValidate = () => {
+            control.dataset.touched = "true";
+            updateFormValidationState(form);
+          };
+
+          control.addEventListener("input", () => updateFormValidationState(form));
+          control.addEventListener("change", onValidate);
+          control.addEventListener("blur", onValidate);
+
+          field.appendChild(label);
+          field.appendChild(control);
+          field.appendChild(errorEl);
+          fieldsWrap.appendChild(field);
+        });
+
+        form.appendChild(fieldsWrap);
+
+        const submitBtn = document.createElement("button");
+        submitBtn.type = "submit";
+        submitBtn.className = "chat-form-submit";
+        submitBtn.textContent = "Enviar";
+        submitBtn.disabled = true;
+        form.appendChild(submitBtn);
+
+        container.appendChild(form);
+        disableChatInput();
+        updateFormValidationState(form);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        const firstInput = form.querySelector("input, textarea, select");
+        if (firstInput) firstInput.focus();
+      }
+
+      function applyWebhookResult(loadingMsg, parsed) {
+        const resolved = resolveWebhookPayload(parsed);
+        if (!resolved) return false;
+
+        if (resolved.type === "form") {
+          if (resolved.form.step) currentStep = resolved.form.step;
+          renderChatForm(loadingMsg, resolved.form);
+          return true;
+        }
+
+        loadingMsg.classList.remove("loading");
+        loadingMsg.textContent = resolved.reply;
+        enableChatInput();
+        return true;
+      }
+
+      async function sendChatMessage(
+        displayText,
+        payloadInput,
+        extraPayload = {},
+        endpoint = webhookUrl
+      ) {
+        if (displayText) {
+          appendMessage(displayText, "user");
+        }
         chatInput.value = "";
 
-        // Desativa os botões do menu inicial para evitar múltiplos cliques
         const optionButtons = document.querySelectorAll(".chat-option-btn");
         optionButtons.forEach((btn) => {
           btn.disabled = true;
         });
 
-        const loadingMsg = createLoadingMessage("Direcionando o atendimento");
+        const loadingMsg = createLoadingMessage("Digitando...");
+
+        const showUnavailable = () => {
+          loadingMsg.classList.remove("loading");
+          loadingMsg.classList.add("error");
+          loadingMsg.textContent =
+            "O atendimento por este canal no momento encontra-se indisponível. Favor utilizar os demais canais de contato presentes em nossa página.";
+          optionButtons.forEach((btn) => {
+            btn.disabled = false;
+          });
+        };
 
         try {
-          const response = await fetch(webhookUrl, {
+          const response = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -744,50 +1370,105 @@
               action: "sendMessage",
               chatInput: payloadInput,
               sessionId: sessionId,
+              step: currentStep,
+              ...extraPayload,
             }),
           });
 
-          if (!response.ok) {
-            throw new Error(`Erro na resposta: ${response.status}`);
+          if (response.status >= 400) {
+            showUnavailable();
+            return;
           }
 
-          const data = await response.json();
-          let reply =
-            data.output ||
-            data.text ||
-            data.message ||
-            (typeof data === "string" ? data : JSON.stringify(data));
+          const rawBody = (await response.text()).trim();
+          if (!rawBody) return;
 
-          loadingMsg.classList.remove("loading");
-          loadingMsg.textContent = reply;
+          let parsed = null;
+          try {
+            parsed = JSON.parse(rawBody);
+          } catch {
+            loadingMsg.classList.remove("loading");
+            loadingMsg.textContent = rawBody;
+            enableChatInput();
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return;
+          }
 
-          // Habilita o campo de input após o primeiro retorno do n8n
-          enableChatInput();
+          applyWebhookResult(loadingMsg, parsed);
         } catch (error) {
-          loadingMsg.classList.remove("loading");
-          loadingMsg.classList.add("error");
-          loadingMsg.textContent =
-            "O atendimento por este canal no momento encontra-se indisponível. Favor utilizar os demais canais de contato presentes em nossa página.";
-
-          // Reabilita as opções para permitir nova tentativa se o usuário desejar
-          optionButtons.forEach((btn) => {
-            btn.disabled = false;
-          });
+          showUnavailable();
         }
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      // Event listener para cliques nos botões de menu (1, 2, 3, 4)
+      chatMessages.addEventListener("submit", (e) => {
+        const formEl = e.target.closest(".chat-dynamic-form");
+        if (!formEl) return;
+        e.preventDefault();
+
+        formEl.querySelectorAll("input, textarea, select").forEach((control) => {
+          control.dataset.touched = "true";
+        });
+
+        if (!updateFormValidationState(formEl)) return;
+
+        const formProfile = resolveFormProfile(formEl.dataset.step);
+        const fields = {};
+        const lines = [];
+
+        formEl.querySelectorAll("input, textarea, select").forEach((control) => {
+          const displayValue = control.value.trim();
+          const value = getFieldSubmitValue(control);
+          const label = control.dataset.label || control.name;
+          const fieldId = control.dataset.fieldId || control.name;
+
+          if (!value && control.dataset.required !== "true") return;
+
+          fields[fieldId] = value;
+          fields[label] = value;
+          lines.push(
+            `${label}: ${
+              control.dataset.mask === "currency" ? displayValue : value
+            }`
+          );
+        });
+
+        fields.origem = formProfile.origem;
+        fields.status = formProfile.status;
+        fields.session_id = sessionId;
+
+        const step = formEl.dataset.step || currentStep;
+        currentStep = step;
+
+        formEl.querySelectorAll("input, textarea, select, button").forEach((el) => {
+          el.disabled = true;
+        });
+
+        sendChatMessage(
+          lines.join("\n"),
+          JSON.stringify(fields),
+          {
+            step,
+            formData: fields,
+            itens: fields,
+            origem: formProfile.origem,
+            status: formProfile.status,
+          },
+          webhookFormUrl
+        );
+      });
+
       document.addEventListener("click", (e) => {
         const btn = e.target.closest(".chat-option-btn");
         if (btn && !btn.disabled) {
           const optionNumber = btn.getAttribute("data-option");
           const optionLabel = btn.getAttribute("data-label") || btn.innerText;
+          currentStep =
+            OPTION_INITIAL_STEP[optionNumber] || `step-${optionNumber}`;
           sendChatMessage(optionLabel, optionNumber);
         }
       });
 
-      // Event listener para envio via formulário de input
       chatForm.addEventListener("submit", (e) => {
         e.preventDefault();
         const text = chatInput.value.trim();
@@ -803,7 +1484,6 @@
         sendChatMessage(text, text);
       });
 
-      // Limpa erro de validação customizado ao digitar
       chatInput.addEventListener("input", () => {
         chatInput.setCustomValidity("");
       });
